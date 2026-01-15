@@ -3,7 +3,7 @@ name: 🏠 CROUS Niort Monitor
 on:
   schedule:
     # Exécute toutes les 30 minutes
-    - cron: '*/5 * * * *'
+    - cron: '*/15 * * * *'
   
   # Permet de lancer manuellement le workflow
   workflow_dispatch:
