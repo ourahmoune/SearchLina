@@ -148,7 +148,7 @@ async def check_offers():
                         address = desc_elem.get_text(strip=True)
                         price = price_elem.get_text(strip=True)
                         link = "https://trouverunlogement.lescrous.fr" + link_elem.get("href", "")
-                        print("link {link}")
+                        print(f" Link est  : {link} ")
                         
                         # ✅ Créer un ID basé sur l'URL de l'offre
                         offer_id = generate_offer_id(title, address, price, link)
