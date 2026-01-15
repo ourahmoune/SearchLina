@@ -1,0 +1,54 @@
+name: 🏠 CROUS Niort Monitor
+
+on:
+  schedule:
+    # Exécute toutes les 30 minutes
+    - cron: '*/5 * * * *'
+  
+  # Permet de lancer manuellement le workflow
+  workflow_dispatch:
+
+jobs:
+  check-offers:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout du code
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Installation de Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: 📦 Installation des dépendances
+        run: |
+          pip install playwright beautifulsoup4
+          playwright install chromium
+          playwright install-deps chromium
+      
+      - name: 📂 Récupérer l'historique seen.json
+        continue-on-error: true
+        run: |
+          if [ -f seen.json ]; then
+            echo "✅ seen.json existe déjà"
+          else
+            echo "📝 Création de seen.json vide"
+            echo "[]" > seen.json
+          fi
+      
+      - name: 🔍 Vérification des offres CROUS
+        env:
+          EMAIL: ${{ secrets.EMAIL }}
+          MOT_DE_PASSE_APP: ${{ secrets.MOT_DE_PASSE_APP }}
+        run: |
+          python crous_monitor.py
+      
+      - name: 💾 Sauvegarder seen.json
+        if: always()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add seen.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "🔄 Mise à jour seen.json [skip ci]"
+          git push
