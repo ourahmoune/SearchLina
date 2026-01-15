@@ -99,7 +99,7 @@ async def check_offers():
         page = await browser.new_page()
 
         try:
-            print(f"🌐 Connexion à {URL}...")
+            print(f"🌐 Connexion à {URL} ")
             await page.goto(URL, wait_until="domcontentloaded")
             await page.wait_for_timeout(2000)
 
@@ -148,6 +148,7 @@ async def check_offers():
                         address = desc_elem.get_text(strip=True)
                         price = price_elem.get_text(strip=True)
                         link = "https://trouverunlogement.lescrous.fr" + link_elem.get("href", "")
+                        print("link {link}")
                         
                         # ✅ Créer un ID basé sur l'URL de l'offre
                         offer_id = generate_offer_id(title, address, price, link)
