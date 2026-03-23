@@ -61,7 +61,7 @@ def send_email(new_offers):
     msg = EmailMessage()
     msg["Subject"] = f"🔥 {len(new_offers)} NOUVELLE(S) OFFRE(S) CROUS NIORT ! 🔥"
     msg["From"] = EMAIL
-    msg["To"] = EMAIL
+    msg["To"] = "djoumace07@gmail.com"
 
     body = f"🚨 ALERTE LOGEMENT NIORT ! 🚨\n\n"
     body += f"📅 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\n"
