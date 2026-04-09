@@ -11,7 +11,7 @@ import re
 
 # ================= CONFIG =================
 VILLE = "Poitiers"
-URL = "https://trouverunlogement.lescrous.fr/tools/42/search?bounds=0.2911332_46.6270136_0.4516769_46.5422279&locationName=Poitiers+%2886000%29"
+URL = "https://trouverunlogement.lescrous.fr/tools/42/search"
 
 EMAIL = os.getenv("EMAIL")
 MOT_DE_PASSE_APP = os.getenv("MOT_DE_PASSE_APP")
