@@ -10,7 +10,7 @@ import hashlib
 import re
 
 # ================= CONFIG =================
-VILLE = "Poitiers"
+VILLE = "Niort"
 URL = "https://trouverunlogement.lescrous.fr/tools/42/search"
 
 EMAIL = os.getenv("EMAIL")
