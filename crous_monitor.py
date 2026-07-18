@@ -10,7 +10,7 @@ import hashlib
 import re
 
 # ================= CONFIG =================
-VILLE = "Niort"
+VILLES = ["Niort", "Poitiers", ]  # ✅ Liste de villes à surveiller
 URL = "https://trouverunlogement.lescrous.fr/tools/42/search"
 
 EMAIL = os.getenv("EMAIL")
@@ -57,18 +57,18 @@ def send_email(new_offers):
     if not EMAIL or not MOT_DE_PASSE_APP:
         print("⚠️ Credentials email manquants")
         return False
-        
+
     msg = EmailMessage()
-    msg["Subject"] = f"🔥 {len(new_offers)} NOUVELLE(S) OFFRE(S) CROUS NIORT ! 🔥"
+    msg["Subject"] = f"🔥 {len(new_offers)} NOUVELLE(S) OFFRE(S) CROUS ! 🔥"
     msg["From"] = EMAIL
     msg["To"] = "massilab06@gmail.com"
 
-    body = f"🚨 ALERTE LOGEMENT NIORT ! 🚨\n\n"
+    body = f"🚨 ALERTE LOGEMENT ! 🚨\n\n"
     body += f"📅 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\n"
     body += "⚡ POSTULE VITE, ÇA VA PARTIR RAPIDEMENT !\n\n"
     body += "="*70 + "\n\n"
     body += ("\n" + "="*70 + "\n\n").join(new_offers)
-    
+
     msg.set_content(body)
 
     try:
@@ -81,104 +81,116 @@ def send_email(new_offers):
         return False
 
 
+async def search_ville(page, ville):
+    """Effectue la recherche sur le site pour une ville donnée et retourne le HTML des résultats"""
+    print(f"🌐 Connexion à {URL} ")
+    await page.goto(URL, wait_until="domcontentloaded")
+    await page.wait_for_timeout(2000)
+
+    input_selector = "#PlaceAutocompletearia-autocomplete-1-input"
+    await page.wait_for_selector(input_selector, state="visible", timeout=10000)
+    await page.click(input_selector)
+    await page.wait_for_timeout(300)
+
+    print(f"🔎 Recherche de '{ville}'...")
+    await page.fill(input_selector, "")
+    await page.type(input_selector, ville, delay=100)
+    await page.wait_for_timeout(1500)
+
+    list_selector = "#PlaceAutocompletearia-autocomplete-1-list"
+    try:
+        await page.wait_for_function(
+            f"document.querySelector('{list_selector}').classList.contains('PlaceAutocomplete__list--has-results')",
+            timeout=5000
+        )
+
+        option_selector = f"li.PlaceAutocomplete__option:has-text('{ville}')"
+        await page.wait_for_selector(option_selector, state="visible", timeout=5000)
+        await page.click(option_selector, force=True)
+    except:
+        await page.keyboard.press("Enter")
+
+    await page.wait_for_timeout(4000)
+
+    return await page.content()
+
+
 async def check_offers():
-    """Vérifie les nouvelles offres CROUS"""
+    """Vérifie les nouvelles offres CROUS pour chaque ville de la liste VILLES"""
     print("="*70)
     print(f"🔍 Vérification {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
     print(f"📧 Email configuré : {EMAIL if EMAIL else '❌ MANQUANT'}")
+    print(f"🏙️  Villes surveillées : {', '.join(VILLES)}")
     print("="*70)
-    
+
     seen = load_seen()
     initial_count = len(seen)
-    
+
     new_found = []
-    current_offers = set()  # ✅ IDs des offres actuellement en ligne
+    current_offers = set()  # ✅ IDs des offres actuellement en ligne (toutes villes confondues)
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
 
-        try:
-            print(f"🌐 Connexion à {URL} ")
-            await page.goto(URL, wait_until="domcontentloaded")
-            await page.wait_for_timeout(2000)
-
-            input_selector = "#PlaceAutocompletearia-autocomplete-1-input"
-            await page.wait_for_selector(input_selector, state="visible", timeout=10000)
-            await page.click(input_selector)
-            await page.wait_for_timeout(300)
-            
-            print(f"🔎 Recherche de '{VILLE}'...")
-            await page.fill(input_selector, "")
-            await page.type(input_selector, VILLE, delay=100)
-            await page.wait_for_timeout(1500)
-
-            list_selector = "#PlaceAutocompletearia-autocomplete-1-list"
+        for ville in VILLES:
+            print("-"*70)
+            print(f"📍 Ville en cours : {ville}")
             try:
-                await page.wait_for_function(
-                    f"document.querySelector('{list_selector}').classList.contains('PlaceAutocomplete__list--has-results')",
-                    timeout=5000
-                )
-                
-                option_selector = f"li.PlaceAutocomplete__option:has-text('{VILLE}')"
-                await page.wait_for_selector(option_selector, state="visible", timeout=5000)
-                await page.click(option_selector, force=True)
-            except:
-                await page.keyboard.press("Enter")
-            
-            await page.wait_for_timeout(4000)
-            
-            soup = BeautifulSoup(await page.content(), "html.parser")
-            
-            results_text = soup.get_text()
-            if "0 logement" in results_text or "Aucun logement" in results_text:
-                print("📭 Aucun logement disponible à Niort")
-            else:
+                html = await search_ville(page, ville)
+                soup = BeautifulSoup(html, "html.parser")
+
+                results_text = soup.get_text()
+                if "0 logement" in results_text or "Aucun logement" in results_text:
+                    print(f"📭 Aucun logement disponible à {ville}")
+                    continue
+
                 cards = soup.select(".fr-card")
-                print(f"🏠 {len(cards)} logement(s) trouvé(s) sur le site")
-                
+                print(f"🏠 {len(cards)} logement(s) trouvé(s) pour {ville}")
+
                 for i, card in enumerate(cards, 1):
                     title_elem = card.select_one(".fr-card__title a")
                     desc_elem = card.select_one(".fr-card__desc")
                     price_elem = card.select_one(".fr-badge")
                     link_elem = card.select_one(".fr-card__title a")
-                    
+
                     if title_elem and desc_elem and price_elem:
                         title = title_elem.get_text(strip=True)
                         address = desc_elem.get_text(strip=True)
                         price = price_elem.get_text(strip=True)
                         link = "https://trouverunlogement.lescrous.fr" + link_elem.get("href", "")
                         print(f" Link est  : {link} ")
-                        
+
                         # ✅ Créer un ID basé sur l'URL de l'offre
                         offer_id = generate_offer_id(title, address, price, link)
                         current_offers.add(offer_id)
-                        
+
                         # ✅ Vérifier si déjà vu
                         if offer_id not in seen:
-                            print(f"🆕 NOUVELLE OFFRE #{i}: {title}")
+                            print(f"🆕 NOUVELLE OFFRE #{i} ({ville}): {title}")
                             print(f"   ID: {offer_id}")
-                            
+
                             details = card.select(".fr-card__detail")
                             details_text = [d.get_text(strip=True) for d in details]
-                            
-                            offer_text = f"""🏠 {title}
+
+                            offer_text = f"""🏙️ Ville recherchée : {ville}
+🏠 {title}
 📍 {address}
 💰 {price}
 🔗 {link}
 📝 {' | '.join(details_text)}"""
-                            
+
                             new_found.append(offer_text)
                             seen.add(offer_id)
                         else:
                             print(f"✅ Offre #{i} déjà connue: {title} (ID: {offer_id})")
 
-        except Exception as e:
-            print(f"❌ Erreur: {e}")
-            import traceback
-            traceback.print_exc()
-        finally:
-            await browser.close()
+            except Exception as e:
+                print(f"❌ Erreur pour la ville {ville}: {e}")
+                import traceback
+                traceback.print_exc()
+
+        await browser.close()
 
     # ✅ NETTOYAGE : Retire de seen les offres qui ne sont plus en ligne
     # Cela permet de détecter les réapparitions
@@ -186,9 +198,9 @@ async def check_offers():
     if removed_offers:
         print(f"🗑️  {len(removed_offers)} offre(s) disparue(s) du site (retirées de l'historique)")
         seen = current_offers.union(seen.intersection(current_offers))
-    
+
     save_seen(seen)
-    
+
     print("="*70)
     print(f"📊 STATISTIQUES :")
     print(f"   • Offres actuellement en ligne : {len(current_offers)}")
@@ -206,7 +218,7 @@ async def check_offers():
             print("❌ Échec envoi email")
     else:
         print("✅ Aucune nouvelle offre - surveillance continue")
-    
+
     print("="*70)
 
 
