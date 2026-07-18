@@ -11,7 +11,7 @@ import re
 
 # ================= CONFIG =================
 VILLES = ["Niort", "Poitiers", ]  # ✅ Liste de villes à surveiller
-URL = "https://trouverunlogement.lescrous.fr/tools/42/search"
+URL = "https://trouverunlogement.lescrous.fr/tools/47/search"
 
 EMAIL = os.getenv("EMAIL")
 MOT_DE_PASSE_APP = os.getenv("MOT_DE_PASSE_APP")
