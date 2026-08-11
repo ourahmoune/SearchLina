@@ -10,7 +10,7 @@ import hashlib
 import re
 
 # ================= CONFIG =================
-VILLES = ["Niort", "Poitiers", ]  # ✅ Liste de villes à surveiller
+VILLES = ["Tours"]  # ✅ Liste de villes à surveiller
 URL = "https://trouverunlogement.lescrous.fr/tools/47/search"
 
 EMAIL = os.getenv("EMAIL")
@@ -61,7 +61,7 @@ def send_email(new_offers):
     msg = EmailMessage()
     msg["Subject"] = f"🔥 {len(new_offers)} NOUVELLE(S) OFFRE(S) CROUS ! 🔥"
     msg["From"] = EMAIL
-    msg["To"] = "massilab06@gmail.com"
+    msg["To"] = "ouhachidyhia44@gmail.com"
 
     body = f"🚨 ALERTE LOGEMENT ! 🚨\n\n"
     body += f"📅 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\n"
