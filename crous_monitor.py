@@ -10,7 +10,7 @@ import hashlib
 import re
 
 # ================= CONFIG =================
-VILLES = ["Tours"]  # ✅ Liste de villes à surveiller
+VILLES = ["Corte"]  # ✅ Liste de villes à surveiller
 URL = "https://trouverunlogement.lescrous.fr/tools/47/search"
 
 EMAIL = os.getenv("EMAIL")
