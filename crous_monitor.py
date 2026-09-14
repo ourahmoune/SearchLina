@@ -88,7 +88,7 @@ async def search_ville(page, ville):
     await page.wait_for_timeout(2000)
 
     input_selector = "#PlaceAutocompletearia-autocomplete-1-input"
-    await page.wait_for_selector(input_selector, state="visible", timeout=10000)
+    await page.wait_for_selector(input_selector, state="visible", timeout=1000000)
     await page.click(input_selector)
     await page.wait_for_timeout(300)
 
@@ -105,7 +105,7 @@ async def search_ville(page, ville):
         )
 
         option_selector = f"li.PlaceAutocomplete__option:has-text('{ville}')"
-        await page.wait_for_selector(option_selector, state="visible", timeout=5000)
+        await page.wait_for_selector(option_selector, state="visible", timeout=500000)
         await page.click(option_selector, force=True)
     except:
         await page.keyboard.press("Enter")
