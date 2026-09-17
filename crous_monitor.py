@@ -10,26 +10,35 @@ import hashlib
 import re
 
 # ================= CONFIG =================
-VILLES = ["Tours"]  # ✅ Liste de villes à surveiller
-URL = "https://trouverunlogement.lescrous.fr/tools/47/search"
+# ✅ Plus de recherche par nom de ville via autocomplétion : chaque entrée est
+# l'URL complète (avec bounds + locationName) qui pointe directement sur les
+# résultats de la zone souhaitée.
+#
+# Pour ajouter une ville :
+#   1. Va sur https://trouverunlogement.lescrous.fr/tools/47/search
+#   2. Fais la recherche manuellement dans un navigateur (tape la ville, clique le résultat)
+#   3. Une fois les résultats affichés, copie l'URL complète dans la barre d'adresse
+#   4. Colle-la ci-dessous avec un nom de ton choix comme clé
+RECHERCHES = {
+    # "Tulle": "https://trouverunlogement.lescrous.fr/tools/47/search?bounds=1.7227855_45.2977832_1.809914_45.2392163&locationName=Tulle+%2819000%29",
+    "Tours": "https://trouverunlogement.lescrous.fr/tools/47/search?bounds=0.6528317_47.4395937_0.7373427_47.3489171&locationName=Tours",
+    # "Poitiers": "https://trouverunlogement.lescrous.fr/tools/47/search?bounds=...&locationName=Poitiers...",
+}
 
 EMAIL = os.getenv("EMAIL")
 MOT_DE_PASSE_APP = os.getenv("MOT_DE_PASSE_APP")
 
 SEEN_FILE = "seen.json"
+DEBUG = True  # ✅ Mets à False une fois que ça fonctionne pour arrêter les captures
 # ==========================================
 
 
 def generate_offer_id(title, address, price, link):
     """Génère un ID stable basé sur l'URL de l'offre"""
-    # Extraire l'ID de l'offre depuis l'URL
-    # Ex: /tools/42/offer/12345 → utilise 12345
     offer_url_id = re.search(r'/offer/(\d+)', link)
     if offer_url_id:
-        # ✅ Utilise l'ID de l'URL (unique par annonce)
         return f"offer_{offer_url_id.group(1)}"
     else:
-        # Fallback : hash des infos
         unique_string = f"{title}|{address}|{price}|{link}"
         return hashlib.md5(unique_string.encode()).hexdigest()
 
@@ -61,7 +70,7 @@ def send_email(new_offers):
     msg = EmailMessage()
     msg["Subject"] = f"🔥 {len(new_offers)} NOUVELLE(S) OFFRE(S) CROUS ! 🔥"
     msg["From"] = EMAIL
-    msg["To"] = "ouhachidyhia44@gmail.com"
+    msg["To"] = "www.aithammouanissa@gmail.com"
 
     body = f"🚨 ALERTE LOGEMENT ! 🚨\n\n"
     body += f"📅 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\n"
@@ -81,72 +90,117 @@ def send_email(new_offers):
         return False
 
 
-async def search_ville(page, ville):
-    """Effectue la recherche sur le site pour une ville donnée et retourne le HTML des résultats"""
-    print(f"🌐 Connexion à {URL} ")
-    await page.goto(URL, wait_until="domcontentloaded")
+async def close_cookie_banner(page):
+    """Ferme le bandeau de consentement cookies s'il est présent"""
+    try:
+        selectors = [
+            "button:has-text('Tout accepter')",
+            "button:has-text('Accepter tout')",
+            "button:has-text('Accepter')",
+            "#tarteaucitronPersonalize2",
+            "button[id*='accept' i]",
+            "button[class*='accept' i]",
+        ]
+        for sel in selectors:
+            btn = page.locator(sel)
+            if await btn.count() > 0:
+                await btn.first.click(timeout=3000)
+                print(f"🍪 Bandeau cookies fermé via: {sel}")
+                await page.wait_for_timeout(1000)
+                return True
+        return False
+    except Exception as e:
+        print(f"ℹ️ Gestion cookies: {e}")
+        return False
+
+
+async def debug_dump(page, nom):
+    """Sauvegarde screenshot + HTML pour inspection si DEBUG=True"""
+    if not DEBUG:
+        return
+    try:
+        safe_name = re.sub(r'\W+', '_', nom)
+        await page.screenshot(path=f"debug_{safe_name}.png", full_page=True)
+        html_debug = await page.content()
+        with open(f"debug_{safe_name}.html", "w", encoding="utf-8") as f:
+            f.write(html_debug)
+        print(f"🖼️ debug_{safe_name}.png / .html sauvegardés")
+    except Exception as e:
+        print(f"⚠️ Échec debug_dump: {e}")
+
+
+async def goto_with_retry(page, url, attempts=3, timeout=45000):
+    """Tente de charger l'URL plusieurs fois en cas de timeout/instabilité réseau"""
+    last_exc = None
+    for attempt in range(1, attempts + 1):
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+            return
+        except Exception as e:
+            last_exc = e
+            print(f"⚠️ Tentative {attempt}/{attempts} échouée pour le chargement: {e}")
+            await page.wait_for_timeout(3000)
+    raise last_exc
+
+
+async def fetch_recherche(page, nom, url):
+    """Charge directement l'URL de recherche (bounds + locationName déjà encodés dans l'URL)"""
+    print(f"🌐 Connexion à {url}")
+    await goto_with_retry(page, url, attempts=3, timeout=45000)
+    await page.wait_for_timeout(3000)
+
+    await close_cookie_banner(page)
+
+    # ✅ Attend l'apparition des cartes de résultats (silencieux si 0 résultat)
+    try:
+        await page.wait_for_selector(".fr-card", timeout=10000)
+    except Exception:
+        print(f"ℹ️ Pas de carte détectée immédiatement pour {nom} (probablement 0 résultat)")
+
     await page.wait_for_timeout(2000)
 
-    input_selector = "#PlaceAutocompletearia-autocomplete-1-input"
-    await page.wait_for_selector(input_selector, state="visible", timeout=1000000)
-    await page.click(input_selector)
-    await page.wait_for_timeout(300)
-
-    print(f"🔎 Recherche de '{ville}'...")
-    await page.fill(input_selector, "")
-    await page.type(input_selector, ville, delay=100)
-    await page.wait_for_timeout(1500)
-
-    list_selector = "#PlaceAutocompletearia-autocomplete-1-list"
-    try:
-        await page.wait_for_function(
-            f"document.querySelector('{list_selector}').classList.contains('PlaceAutocomplete__list--has-results')",
-            timeout=5000
-        )
-
-        option_selector = f"li.PlaceAutocomplete__option:has-text('{ville}')"
-        await page.wait_for_selector(option_selector, state="visible", timeout=500000)
-        await page.click(option_selector, force=True)
-    except:
-        await page.keyboard.press("Enter")
-
-    await page.wait_for_timeout(4000)
-
-    return await page.content()
+    html = await page.content()
+    await debug_dump(page, nom)
+    return html
 
 
 async def check_offers():
-    """Vérifie les nouvelles offres CROUS pour chaque ville de la liste VILLES"""
+    """Vérifie les nouvelles offres CROUS pour chaque recherche définie dans RECHERCHES"""
     print("="*70)
     print(f"🔍 Vérification {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
     print(f"📧 Email configuré : {EMAIL if EMAIL else '❌ MANQUANT'}")
-    print(f"🏙️  Villes surveillées : {', '.join(VILLES)}")
+    print(f"🏙️  Recherches surveillées : {', '.join(RECHERCHES.keys())}")
     print("="*70)
 
     seen = load_seen()
     initial_count = len(seen)
 
     new_found = []
-    current_offers = set()  # ✅ IDs des offres actuellement en ligne (toutes villes confondues)
+    current_offers = set()
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
+        browser = await p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
+        page = await browser.new_page(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            viewport={"width": 1920, "height": 1080},
+            locale="fr-FR",
+        )
+        await page.set_extra_http_headers({"Accept-Language": "fr-FR,fr;q=0.9"})
 
-        for ville in VILLES:
+        for nom, url in RECHERCHES.items():
             print("-"*70)
-            print(f"📍 Ville en cours : {ville}")
+            print(f"📍 Recherche en cours : {nom}")
             try:
-                html = await search_ville(page, ville)
+                html = await fetch_recherche(page, nom, url)
                 soup = BeautifulSoup(html, "html.parser")
 
                 results_text = soup.get_text()
                 if "0 logement" in results_text or "Aucun logement" in results_text:
-                    print(f"📭 Aucun logement disponible à {ville}")
+                    print(f"📭 Aucun logement disponible pour {nom}")
                     continue
 
                 cards = soup.select(".fr-card")
-                print(f"🏠 {len(cards)} logement(s) trouvé(s) pour {ville}")
+                print(f"🏠 {len(cards)} logement(s) trouvé(s) pour {nom}")
 
                 for i, card in enumerate(cards, 1):
                     title_elem = card.select_one(".fr-card__title a")
@@ -161,19 +215,17 @@ async def check_offers():
                         link = "https://trouverunlogement.lescrous.fr" + link_elem.get("href", "")
                         print(f" Link est  : {link} ")
 
-                        # ✅ Créer un ID basé sur l'URL de l'offre
                         offer_id = generate_offer_id(title, address, price, link)
                         current_offers.add(offer_id)
 
-                        # ✅ Vérifier si déjà vu
                         if offer_id not in seen:
-                            print(f"🆕 NOUVELLE OFFRE #{i} ({ville}): {title}")
+                            print(f"🆕 NOUVELLE OFFRE #{i} ({nom}): {title}")
                             print(f"   ID: {offer_id}")
 
                             details = card.select(".fr-card__detail")
                             details_text = [d.get_text(strip=True) for d in details]
 
-                            offer_text = f"""🏙️ Ville recherchée : {ville}
+                            offer_text = f"""🏙️ Recherche : {nom}
 🏠 {title}
 📍 {address}
 💰 {price}
@@ -186,14 +238,12 @@ async def check_offers():
                             print(f"✅ Offre #{i} déjà connue: {title} (ID: {offer_id})")
 
             except Exception as e:
-                print(f"❌ Erreur pour la ville {ville}: {e}")
+                print(f"❌ Erreur pour la recherche {nom}: {e}")
                 import traceback
                 traceback.print_exc()
 
         await browser.close()
 
-    # ✅ NETTOYAGE : Retire de seen les offres qui ne sont plus en ligne
-    # Cela permet de détecter les réapparitions
     removed_offers = seen - current_offers
     if removed_offers:
         print(f"🗑️  {len(removed_offers)} offre(s) disparue(s) du site (retirées de l'historique)")
