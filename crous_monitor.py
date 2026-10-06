@@ -21,7 +21,7 @@ import re
 #   4. Colle-la ci-dessous avec un nom de ton choix comme clé
 RECHERCHES = {
     # "Tulle": "https://trouverunlogement.lescrous.fr/tools/47/search?bounds=1.7227855_45.2977832_1.809914_45.2392163&locationName=Tulle+%2819000%29",
-    "Tours": "https://trouverunlogement.lescrous.fr/tools/47/search?bounds=0.6528317_47.4395937_0.7373427_47.3489171&locationName=Tours",
+    "Orsay": "https://trouverunlogement.lescrous.fr/tools/47/search?bounds=2.1695755_48.7188772_2.209699_48.6755091&locationName=Orsay+%2891400%29",
     # "Poitiers": "https://trouverunlogement.lescrous.fr/tools/47/search?bounds=...&locationName=Poitiers...",
 }
 
@@ -70,7 +70,7 @@ def send_email(new_offers):
     msg = EmailMessage()
     msg["Subject"] = f"🔥 {len(new_offers)} NOUVELLE(S) OFFRE(S) CROUS ! 🔥"
     msg["From"] = EMAIL
-    msg["To"] = "www.aithammouanissa@gmail.com"
+    msg["To"] = "aminamansouur@gmail.com"
 
     body = f"🚨 ALERTE LOGEMENT ! 🚨\n\n"
     body += f"📅 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\n"
