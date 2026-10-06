@@ -21,7 +21,7 @@ import re
 #   4. Colle-la ci-dessous avec un nom de ton choix comme clé
 RECHERCHES = {
     # "Tulle": "https://trouverunlogement.lescrous.fr/tools/47/search?bounds=1.7227855_45.2977832_1.809914_45.2392163&locationName=Tulle+%2819000%29",
-    "Orsay": "https://trouverunlogement.lescrous.fr/tools/47/search?bounds=2.1695755_48.7188772_2.209699_48.6755091&locationName=Orsay+%2891400%29",
+    "Poitiers": "https://trouverunlogement.lescrous.fr/tools/47/search?bounds=0.2911332_46.6270136_0.4516769_46.5422279&locationName=Poitiers+%2886000%29",
     # "Poitiers": "https://trouverunlogement.lescrous.fr/tools/47/search?bounds=...&locationName=Poitiers...",
 }
 
