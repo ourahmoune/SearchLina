@@ -2,53 +2,58 @@ name: 🏠 CROUS Tours Monitor
 
 on:
   schedule:
-    # Exécute toutes les 30 minutes
-         - cron: '30 17 * * *'
-  
-  # Permet de lancer manuellement le workflow
+    # Minutes décalées pour éviter les pics de charge de GitHub (:00, :15, :30, :45)
+    - cron: '3,18,33,48 * * * *'
   workflow_dispatch:
+
+# Évite que deux exécutions se chevauchent (conflits sur seen.json)
+concurrency:
+  group: crous-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: write
 
 jobs:
   check-offers:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 10
+
     steps:
       - name: 📥 Checkout du code
         uses: actions/checkout@v4
-      
+
       - name: 🐍 Installation de Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+          cache: 'pip'
+
       - name: 📦 Installation des dépendances
         run: |
           pip install playwright beautifulsoup4
-          playwright install chromium
-          playwright install-deps chromium
-      
-      - name: 📂 Récupérer l'historique seen.json
-        continue-on-error: true
+          playwright install --with-deps chromium
+
+      - name: 📂 Initialiser seen.json si absent
         run: |
-          if [ -f seen.json ]; then
-            echo "✅ seen.json existe déjà"
-          else
-            echo "📝 Création de seen.json vide"
-            echo "[]" > seen.json
-          fi
-      
+          [ -f seen.json ] || echo "[]" > seen.json
+
       - name: 🔍 Vérification des offres CROUS
         env:
           EMAIL: ${{ secrets.EMAIL }}
           MOT_DE_PASSE_APP: ${{ secrets.MOT_DE_PASSE_APP }}
-        run: |
-          python crous_monitor.py
-      
+        run: python crous_monitor.py
+
       - name: 💾 Sauvegarder seen.json
         if: always()
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
           git add seen.json
-          git diff --quiet && git diff --staged --quiet || git commit -m "🔄 Mise à jour seen.json [skip ci]"
-          git push
+          if git diff --staged --quiet; then
+            echo "Aucun changement dans seen.json"
+          else
+            git commit -m "🔄 Mise à jour seen.json [skip ci]"
+            git pull --rebase origin ${{ github.ref_name }}
+            git push
+          fi
