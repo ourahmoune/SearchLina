@@ -3,7 +3,7 @@ name: 🏠 CROUS Tours Monitor
 on:
   schedule:
     # Exécute toutes les 30 minutes
-     - cron: '20 * * * *'
+         - cron: '30 17 * * *'
   
   # Permet de lancer manuellement le workflow
   workflow_dispatch:
