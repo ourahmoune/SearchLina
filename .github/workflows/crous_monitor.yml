@@ -2,7 +2,7 @@ name: 🏠 CROUS Tours Monitor
 
 on:
   schedule:
-    # Minutes décalées pour éviter les pics de charge de GitHub (:00, :15, :30, :45)
+    # Minutes décalées pour éviter les pics de charge de GitHub
     - cron: '3,18,33,48 * * * *'
   workflow_dispatch:
 
